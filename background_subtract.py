@@ -13,17 +13,20 @@ def cropped(frame):
     '''
     return frame[:, :frame.shape[1] / 2, :]
 
+
 def expand_blob(frame):
     '''
     blur, then threshold, then blur again
     :param frame:
     :return:
     '''
-    for i in range(2):
-        frame = cv2.blur(frame,(20,20))
-        frame = cv2.threshold(frame,20,255,cv2.THRESH_BINARY)[1]
-    return frame
 
+    for i in range(3):
+        frame = cv2.blur(frame, (10, 10))
+        # frame = cv2.medianBlur(frame,21)
+        # frame = cv2.GaussianBlur(frame,(11,11),0)
+        frame = cv2.threshold(frame, 30, 255, cv2.THRESH_BINARY)[1]
+    return frame
 
 
 def run(output_file=None):
@@ -41,7 +44,7 @@ def run(output_file=None):
 
     # Filter by Area.
     params.filterByArea = True
-    params.minArea = 3000
+    params.minArea = 1500
     params.maxArea = 10000
 
     # # Filter by Circularity
@@ -65,7 +68,7 @@ def run(output_file=None):
     else:
         detector = cv2.SimpleBlobDetector_create(params)
 
-    fgbg = cv2.BackgroundSubtractorMOG()
+    fgbg = cv2.BackgroundSubtractorMOG2()
 
     if output_file is not None:
         if os.path.isfile(output_file):
@@ -78,8 +81,9 @@ def run(output_file=None):
         if ret is False:
             break
 
-        fgmask = expand_blob(fgbg.apply(cropped(frame)))
-
+        fgmask = fgbg.apply(cropped(frame))
+        fgmask = cv2.threshold(fgmask, 250, 255, cv2.THRESH_BINARY)[1]
+        fgmask = cv2.medianBlur(fgmask, 41)
 
         keypoints = detector.detect(fgmask)
 
@@ -87,14 +91,14 @@ def run(output_file=None):
         # cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS ensures the size of the circle corresponds to the size of blob
         frame_with_keypoints = cv2.drawKeypoints(
             fgmask, keypoints,
-            np.array([]), (255, 0, 255),
+            np.array([]), (0, 0, 255),
             cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
         cv2.imshow('frame', frame_with_keypoints)
         if output_file is not None:
-            out.write(fgmask)
+            out.write(cv2.cvtColor(frame_with_keypoints, cv2.COLOR_BGR2GRAY))
 
-        if cv2.waitKey(10) & 0xFF == ord('q'):
+        if cv2.waitKey(30) & 0xFF == ord('q'):
             break
 
     cap.release()
